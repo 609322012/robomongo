@@ -111,17 +111,17 @@ namespace Robomongo
         auto hline = new QFrame();
         hline->setFrameShape(QFrame::HLine);
         hline->setFrameShadow(QFrame::Sunken);
-        _srvEdit = new QLineEdit();
-        _srvEdit->setPlaceholderText("Import connection details from MongoDB SRV connection string");
-        _srvButton = new QPushButton("From SRV");
+        _uriEdit = new QLineEdit();
+        _uriEdit->setPlaceholderText("Import connection details from MongoDB URI connection string");
+        _uriButton = new QPushButton("From URI");
 #ifdef _WIN32
-        _srvButton->setMaximumHeight(HighDpiConstants::WIN_HIGH_DPI_BUTTON_HEIGHT);
-        _srvButton->setMinimumWidth(60);
+        _uriButton->setMaximumHeight(HighDpiConstants::WIN_HIGH_DPI_BUTTON_HEIGHT);
+        _uriButton->setMinimumWidth(60);
 #else   // MacOS
-        _srvButton->setMaximumHeight(HighDpiConstants::MACOS_HIGH_DPI_BUTTON_HEIGHT);   
-        _srvButton->setMaximumWidth(90);
+        _uriButton->setMaximumHeight(HighDpiConstants::MACOS_HIGH_DPI_BUTTON_HEIGHT);   
+        _uriButton->setMaximumWidth(90);
 #endif        
-        VERIFY(connect(_srvButton, SIGNAL(clicked()), this, SLOT(on_srvButton_clicked())));
+        VERIFY(connect(_uriButton, SIGNAL(clicked()), this, SLOT(on_uriButton_clicked())));
 
         auto connLayout = new QGridLayout;
         connLayout->setVerticalSpacing(8);
@@ -142,8 +142,8 @@ namespace Robomongo
         connLayout->addWidget(_setNameEdit,                   9, 1, 1, 3, Qt::AlignTop);
         connLayout->addWidget(fakeSpacer,                    10, 0);
         connLayout->addWidget(hline,                         11, 0, 1, 4);
-        connLayout->addWidget(_srvButton,                    13, 0);
-        connLayout->addWidget(_srvEdit,                      13, 1, 1, 3);
+        connLayout->addWidget(_uriButton,                    13, 0);
+        connLayout->addWidget(_uriEdit,                      13, 1, 1, 3);
 
         connLayout->setRowStretch(10, 1);        
 #ifdef __APPLE__
@@ -223,6 +223,16 @@ namespace Robomongo
         }
 
         return true;
+    }
+
+    void ConnectionBasicTab::clearTab()
+    {
+        _connectionType->setCurrentIndex(0);
+        _connectionName->setText("New Connection");
+        _serverAddress->clear();
+        _serverPort->clear();
+        _members->clear();
+        _setNameEdit->clear();
     }
 
     void ConnectionBasicTab::on_ConnectionTypeChange(int index)
@@ -318,38 +328,71 @@ namespace Robomongo
         item->setText(0, str);
     }
 
-    void ConnectionBasicTab::on_srvButton_clicked()
+    void ConnectionBasicTab::on_uriButton_clicked()
     {
-        QString srvStr = _srvEdit->text().simplified();
-        srvStr.replace(" ", "");
-        auto const statusWithMongoURI = mongo::MongoURI::parse(srvStr.toStdString());
-        if (!statusWithMongoURI.isOK()) {
+        // Parse Mongo URI
+        QString uriStr = _uriEdit->text().simplified();
+        uriStr.replace(" ", "");
+        auto const statusWithURI = mongo::MongoURI::parse(uriStr.toStdString());
+        if (!statusWithURI.isOK()) {
             QMessageBox errorBox;
-            errorBox.critical(this, "Error", ("MongoDB SRV:\n" + statusWithMongoURI.getStatus().toString()).c_str());
+            errorBox.critical(
+                this, "Error", ("MongoDB URI:\n" + statusWithURI.getStatus().toString()).c_str()
+            );
             errorBox.show();
             return;
         }
-        auto const mongoUri = statusWithMongoURI.getValue();
-        auto const db = QString::fromStdString(mongoUri.getDatabase());        
+        auto const mongoUri = statusWithURI.getValue();
+
+        // Clear tabs
+        clearTab();
+        _connectionDialog->clearConnAuthTab();
+        _connectionDialog->clearSslTab();
+
+        // Set Basic (this) Tab
+        auto const isReplicaSet = mongoUri.type() == mongo::ConnectionString::ConnectionType::SET;
+        if(isReplicaSet) {
+            _connectionType->setCurrentIndex(1);    // Switch to Replica Set
+            for (auto const& hostAndPort : mongoUri.getServers()) {
+                auto host = QString::fromStdString(hostAndPort.host());
+                host.endsWith('.') ? host.remove(host.size()-1, 1) : "no-op";
+                auto const newHostAndPort = host + ':' + QString::number(hostAndPort.port());
+                auto item = new QTreeWidgetItem;
+                item->setText(0, newHostAndPort);
+                item->setFlags(item->flags() | Qt::ItemIsEditable);
+                _members->addTopLevelItem(item);
+            }
+            _setNameEdit->setText(QString::fromStdString(mongoUri.getSetName()));
+        }
+        else {  // Standalone
+            _connectionType->setCurrentIndex(0);
+            _serverAddress->setText(QString::fromStdString(mongoUri.getServers()[0].host()));
+            _serverPort->setText(QString::number(mongoUri.getServers()[0].port()));
+        }
+        // Set Auth Tab
         auto const user = QString::fromStdString(mongoUri.getUser());
         auto const pwd = QString::fromStdString(mongoUri.getPassword());
         auto const authDb = QString::fromStdString(mongoUri.getAuthenticationDatabase());
+        auto const authMechanism = mongoUri.getOption("authMechanism").get_value_or("");
+        if(!user.isEmpty()) _connectionDialog->setAuthTab(
+            authDb, user, pwd, authMechanismFromStr(authMechanism)
+        );
+        // Set SSL Tab
+        if(mongoUri.getSSLMode() == mongo::transport::ConnectSSLMode::kEnableSSL) {
+            auto tlsAllowInvalidCertificates = mongoUri.getOption("tlsAllowInvalidCertificates");
+            int const authMethodIndex = tlsAllowInvalidCertificates.get_value_or("") == "true" ? 0 : 1;
+            auto const caFile = mongoUri.getOption("tlsCAFile").get_value_or("");
+            auto const certKeyFile = mongoUri.getOption("tlsCertificateKeyFile").get_value_or("");
+            auto const certKeyFilePwd = 
+                mongoUri.getOption("tlsCertificateKeyFilePassword").get_value_or("");
+            auto const allowInvalidHostnames = 
+                mongoUri.getOption("tlsAllowInvalidHostnames").get_value_or("") == "true";
 
-        // Basic (this) Tab
-        _members->clear();
-        _connectionType->setCurrentIndex(1);    // Switch to Replica Set
-        for (auto const& hostAndPort : mongoUri.getServers()) {
-            auto host = QString::fromStdString(hostAndPort.host());
-            host.endsWith('.') ? host.remove(host.size()-1, 1) : "no-op";
-            auto const newHostAndPort = host + ':' + QString::number(hostAndPort.port());
-            auto item = new QTreeWidgetItem;
-            item->setText(0, newHostAndPort);
-            item->setFlags(item->flags() | Qt::ItemIsEditable);
-            _members->addTopLevelItem(item);
+            _connectionDialog->setSslTab(
+                authMethodIndex, allowInvalidHostnames, caFile, certKeyFile, certKeyFilePwd
+            );
         }
-        _setNameEdit->setText(QString::fromStdString(mongoUri.getSetName()));        
-        _connectionDialog->setAuthTab(authDb, user, pwd);   // Auth Tab        
-        _connectionDialog->enableSslBasic();    // TLS Tab        
-        _connectionDialog->setDefaultDb(db);    // Advanced Tab
+        // Advanced Tab
+        _connectionDialog->setDefaultDb(QString::fromStdString(mongoUri.getDatabase()));
     }
 }

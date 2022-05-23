@@ -207,10 +207,34 @@ namespace Robomongo
         return _useSslCheckBox->isChecked(); 
     }
 
-    void SSLTab::enableSslBasic()
+    void SSLTab::clearTab()
     {
+        _authMethodComboBox->setCurrentIndex(1);
+        _caFilePathLineEdit->clear();
+        _usePemFileCheckBox->setChecked(false);
+        _pemFilePathLineEdit->clear();
+        _pemPassLineEdit->clear();
+        _useAdvancedOptionsCheckBox->setChecked(false);
+        _allowInvalidHostnamesComboBox->setCurrentIndex(0);
+    }
+
+    void SSLTab::setSslOptions(
+        int index,
+        bool allowInvalidHostnames,
+        std::string_view caFile,
+        std::string_view certPemFile,
+        std::string_view certPemFilePwd
+    ) {
         _useSslCheckBox->setChecked(true);
-        _authMethodComboBox->setCurrentIndex(0);
+        _authMethodComboBox->setCurrentIndex(index);
+        _caFilePathLineEdit->setText(QString::fromStdString(std::string(caFile)));
+
+        if(!certPemFile.empty()) _usePemFileCheckBox->setChecked(true);
+        _pemFilePathLineEdit->setText(QString::fromStdString(std::string(certPemFile)));
+        _pemPassLineEdit->setText(QString::fromStdString(std::string(certPemFilePwd)));
+
+        if (allowInvalidHostnames) _useAdvancedOptionsCheckBox->setChecked(true);
+        _allowInvalidHostnamesComboBox->setCurrentIndex(allowInvalidHostnames);
     }
 
     void SSLTab::useSslCheckBoxStateChange(int state)
@@ -400,4 +424,3 @@ namespace Robomongo
         return QDir::toNativeSeparators(fileName);
     }
 }
-

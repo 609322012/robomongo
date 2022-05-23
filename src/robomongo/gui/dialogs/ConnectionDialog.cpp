@@ -99,14 +99,13 @@ namespace Robomongo
         QWidget::closeEvent(event);
     }
 
-    void ConnectionDialog::setAuthTab(QString const& db, QString const& username, QString const& pwd)
-    {
-        _authTab->setAuthTab(db, username, pwd);
-    }
-
-    void ConnectionDialog::enableSslBasic()
-    {
-        _sslTab->enableSslBasic();
+    void ConnectionDialog::setAuthTab(
+        QString const& db, 
+        QString const& username, 
+        QString const& pwd, 
+        AuthMechanism authMech
+    ) {
+        _authTab->setAuthTab(db, username, pwd, authMech);
     }
 
     void ConnectionDialog::setDefaultDb(QString const& defaultDb)
@@ -121,6 +120,26 @@ namespace Robomongo
         
         _sshTab->setDisabled(isReplicaSet);
         _sshTab->toggleSshCheckboxToolTip(isReplicaSet);
+    }
+
+    void ConnectionDialog::clearConnAuthTab()
+    {
+        _authTab->clearTab();
+    }
+
+    void ConnectionDialog::clearSslTab()
+    {
+        _sslTab->clearTab();
+    }
+
+    void ConnectionDialog::setSslTab(
+        int index,
+        bool allowInvalidHostnames,
+        std::string_view caFile,
+        std::string_view certPemFile,
+        std::string_view certPemFilePwd
+    ) {
+        _sslTab->setSslOptions(index, allowInvalidHostnames, caFile, certPemFile, certPemFilePwd);
     }
 
     void ConnectionDialog::restoreWindowSettings()

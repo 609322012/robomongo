@@ -3,6 +3,7 @@
 #include <QDialog>
 
 #include "robomongo/core/Core.h"
+#include "robomongo/gui/utils/GuiConstants.h"
 
 namespace Robomongo
 {
@@ -12,6 +13,7 @@ namespace Robomongo
     class ConnectionAdvancedTab;
     class SSLTab;
     class SshTunnelTab;
+
     /**
      * @brief This Dialog allows to edit single connection
      */
@@ -26,10 +28,24 @@ namespace Robomongo
         ConnectionDialog(ConnectionSettings *connection, QWidget *parent = nullptr);
         
         ConnectionSettings *const connection() const { return _connection; }        
-        void setAuthTab(QString const& db, QString const& username, QString const& pwd);
-        void enableSslBasic();
+        void setAuthTab(
+            QString const& db, 
+            QString const& username, 
+            QString const& pwd, 
+            AuthMechanism authMech
+        );
         void setDefaultDb(QString const& defaultDb);
         void toggleSshSupport(bool isReplicaSet);
+        void clearConnAuthTab();
+        
+        void clearSslTab();
+        void setSslTab(
+            int index,
+            bool allowInvalidHostnames,
+            std::string_view caFile,
+            std::string_view certPemFile,
+            std::string_view certPemFilePwd
+        );
 
     public Q_SLOTS:
         /**

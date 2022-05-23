@@ -1,6 +1,9 @@
 #pragma once
 
 #include <QWidget>
+
+#include "robomongo/gui/utils/GuiConstants.h"
+
 QT_BEGIN_NAMESPACE
 class QLineEdit;
 class QLabel;
@@ -20,7 +23,13 @@ namespace Robomongo
     public:
         ConnectionAuthTab(ConnectionSettings *settings);
         void accept();
-        void setAuthTab(QString const db, QString const username, QString const pwd);
+        void setAuthTab(
+            QString const db, 
+            QString const username, 
+            QString const pwd, 
+            AuthMechanism authMech
+        );
+        void clearTab();
 
     private Q_SLOTS:
         void toggleEchoMode();

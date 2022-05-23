@@ -11,7 +11,6 @@
 #include "robomongo/core/settings/CredentialSettings.h"
 #include "robomongo/core/utils/QtUtils.h"
 #include "robomongo/gui/GuiRegistry.h"
-#include "robomongo/gui/utils/GuiConstants.h"
 
 namespace Robomongo
 {
@@ -141,12 +140,28 @@ namespace Robomongo
         _settings->addCredential(credential);
     }
 
-    void ConnectionAuthTab::setAuthTab(QString const db, QString const username, QString const pwd)
-    {
+    void ConnectionAuthTab::setAuthTab(
+        QString const db, 
+        QString const username, 
+        QString const pwd, 
+        AuthMechanism authMech
+    ) {    
         _useAuth->setChecked(true);
         _databaseName->setText(db);
         _userName->setText(username);
         _userPassword->setText(pwd);
+        _mechanismComboBox->setCurrentIndex(int(authMech));
+    }
+
+    void ConnectionAuthTab::clearTab()
+    {
+        _useAuth->setChecked(false);
+        _databaseName->clear();
+        _userName->clear();
+        _userPassword->clear();
+        _mechanismComboBox->setCurrentIndex(0);
+        _useManuallyVisibleDbs->setChecked(false);
+        _manuallyVisibleDbs->clear();        
     }
 
     void ConnectionAuthTab::toggleEchoMode()
